@@ -1,9 +1,11 @@
 # Documentação
 
-Pastas previstas para o pacote final:
-
-* `adr/`: registros de decisão arquitetural (4 registros: arquitetura, persistência, padrões e testes ou integridade)
-* `uml/`: diagrama de classes atualizado
-* `rastreabilidade.md`: matriz caso de uso, regra, classe/método, teste e evidência
-* `validacao.md`: testes executados, os dois defeitos intencionais e a comparação antes e depois da melhoria
-* `uso-ia.md`: declaração e as três interações importantes com IA
+* [adr/](adr/): registros de decisão arquitetural
+  * [001 Arquitetura em camadas](adr/001-arquitetura-em-camadas.md)
+  * [002 Persistência em SQLite](adr/002-persistencia-sqlite.md)
+  * [003 Padrões de projeto](adr/003-padroes-de-projeto.md)
+  * [004 Testes e integridade dos dados](adr/004-testes-e-integridade.md)
+* [uml/diagrama-classes.md](uml/diagrama-classes.md): diagrama de classes do domínio e das camadas, em Mermaid
+* [rastreabilidade.md](rastreabilidade.md): caso de uso, regra, classe e método, teste e evidência
+* [validacao.md](validacao.md): testes executados, os dois defeitos intencionais e a comparação antes e depois da melhoria
+* [uso-ia.md](uso-ia.md): declaração e as três interações importantes com IA
