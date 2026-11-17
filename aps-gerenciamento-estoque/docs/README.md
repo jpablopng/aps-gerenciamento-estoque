@@ -8,4 +8,3 @@
 * [uml/diagrama-classes.md](uml/diagrama-classes.md): diagrama de classes do domínio e das camadas, em Mermaid
 * [rastreabilidade.md](rastreabilidade.md): caso de uso, regra, classe e método, teste e evidência
 * [validacao.md](validacao.md): testes executados, os dois defeitos intencionais e a comparação antes e depois da melhoria
-* [uso-ia.md](uso-ia.md): declaração e as três interações importantes com IA
