@@ -1,5 +1,6 @@
 # Documentação
 
+* [casos-de-uso.md](casos-de-uso.md): diagrama e descrição completa de UC01 a UC04
 * [adr/](adr/): registros de decisão arquitetural
   * [001 Arquitetura em camadas](adr/001-arquitetura-em-camadas.md)
   * [002 Persistência em SQLite](adr/002-persistencia-sqlite.md)
