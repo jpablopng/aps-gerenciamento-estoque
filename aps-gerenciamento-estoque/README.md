@@ -15,9 +15,9 @@ Professor: Dr. Dorgival Netto
 | Nome completo | E-mail institucional | Usuário GitHub | Link do perfil |
 |---|---|---|---|
 | João Pablo da Silva | joao.pablo@dcx.ufpb.br | @jpablopng | https://github.com/jpablopng |
-| Luigi Truglio Amarante Chaves | nome@dcx.ufpb.br | @usuario | https://github.com/usuario |
-| Alex Renovato | nome@dcx.ufpb.br | @usuario | https://github.com/usuario |
-| Pedro Filho | nome@dcx.ufpb.br | @usuario | https://github.com/usuario |
+| Luigi Truglio Amarante Chaves | luigi.truglio@dcx.ufpb.br | @luigidcx | https://github.com/luigidcx |
+| Alex Renovato | alex.renovato@dcx.ufpb.br | @AlexRenovato | https://github.com/AlexRenovato |
+| Pedro Filho |  pedro.fernandes@dcx.ufpb.brr | @PedroFernandes-fa | https://github.com/usuario |
 
 ## Objetivo do sistema
 
