@@ -1,5 +1,12 @@
 package br.ufpb.aps.estoque;
 
+import br.ufpb.aps.estoque.controller.AlertaConsole;
+import br.ufpb.aps.estoque.controller.DemonstracaoEstoque;
+import br.ufpb.aps.estoque.repository.EstoqueRepositoryComFalha;
+import br.ufpb.aps.estoque.repository.memoria.EstoqueEmMemoria;
+import br.ufpb.aps.estoque.service.EstoqueService;
+import br.ufpb.aps.estoque.service.ReposicaoAteNivelAlvo;
+
 /**
  * Ponto de entrada da aplicação.
  *
@@ -10,7 +17,11 @@ public class Main {
 
     public static void main(String[] args) {
         System.out.println("Gerenciamento de Estoque | APS 2026.2 | Grupo 01");
-        // TODO: instanciar repositórios, serviços e o controller do console
-        // e injetar as dependências pelo construtor.
+
+        EstoqueRepositoryComFalha repositorio = new EstoqueRepositoryComFalha(new EstoqueEmMemoria());
+        EstoqueService estoque = new EstoqueService(repositorio, new ReposicaoAteNivelAlvo(2));
+        estoque.adicionarOuvinte(new AlertaConsole(System.out));
+
+        new DemonstracaoEstoque(estoque, repositorio, System.out).executar();
     }
 }

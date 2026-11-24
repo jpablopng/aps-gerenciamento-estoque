@@ -1,69 +1,77 @@
 # Diagrama de classes
 
-Fonte em Mermaid, renderizado direto pelo GitHub. Para exportar como imagem, cole o bloco em
-https://mermaid.live e baixe em PNG ou SVG, salvando nesta pasta como `diagrama-dominio.png` e `diagrama-camadas.png`.
+Classes implementadas em `src/main/java`. Fonte em Mermaid (`.mmd`) e imagem exportada (`.png`).
 
 ## 1. Domínio (`model`)
 
-A `Venda` é o centro: liga quem vendeu, os itens, os produtos e o pagamento.
+O `SaldoEstoque` separa o estoque físico do reservado; o disponível é físico menos reservado.
+A `Reserva` só pode ser confirmada ou cancelada enquanto está ATIVA. Cada operação gera uma `Movimentacao`.
+
+![Domínio](diagrama-dominio.png)
 
 ```mermaid
 classDiagram
     direction LR
 
-    class Usuario {
-        -Long id
-        -String nome
-        -String login
-        -String senhaHash
-    }
-
-    class Venda {
-        -Long id
-        -LocalDateTime dataHora
-        -StatusVenda status
-        +adicionarItem(Produto, Quantidade)
-        +total() BigDecimal
-        +confirmar(Pagamento)
-    }
-
-    class ItemVenda {
-        -Quantidade quantidade
-        -BigDecimal precoUnitario
-        +subtotal() BigDecimal
-    }
-
-    class Pagamento {
-        -FormaPagamento forma
-        -BigDecimal valor
-        -String detalhe
-    }
-
     class Produto {
-        -Long id
+        -String codigo
         -String nome
-        -String marca
-        -BigDecimal preco
-        -Quantidade quantidade
         -Quantidade estoqueMinimo
-        +darBaixa(Quantidade)
-        +repor(Quantidade)
-        +atingiuMinimo() boolean
+        +codigo() String
+        +estoqueMinimo() Quantidade
     }
 
-    class Categoria {
-        -Long id
-        -String nome
+    class SaldoEstoque {
+        -String produtoCodigo
+        -Quantidade fisico
+        -Quantidade reservado
+        +disponivel() Quantidade
+        +comEntrada(Quantidade) SaldoEstoque
+        +comReserva(Quantidade) SaldoEstoque
+        +semReserva(Quantidade) SaldoEstoque
+        +comSaidaDaReserva(Quantidade) SaldoEstoque
+        +comSaidaDireta(Quantidade) SaldoEstoque
     }
 
-    class EntradaEstoque {
-        -Long id
-        -LocalDateTime dataHora
+    class Reserva {
+        -long id
+        -String produtoCodigo
         -Quantidade quantidade
+        -StatusReserva status
+        -LocalDateTime criadaEm
+        +nova(long, String, Quantidade, LocalDateTime) Reserva$
+        +confirmada() Reserva
+        +cancelada() Reserva
+    }
+
+    class StatusReserva {
+        <<enumeration>>
+        ATIVA
+        CONFIRMADA
+        CANCELADA
+    }
+
+    class Movimentacao {
+        <<record>>
+        +long id
+        +String produtoCodigo
+        +TipoMovimentacao tipo
+        +Quantidade quantidade
+        +Long reservaId
+        +LocalDateTime dataHora
+        +Quantidade fisicoApos
+        +Quantidade disponivelApos
+    }
+
+    class TipoMovimentacao {
+        <<enumeration>>
+        ENTRADA
+        RESERVA
+        CANCELAMENTO_RESERVA
+        SAIDA
     }
 
     class Quantidade {
-        <<value object>>
         -int valor
         +de(int) Quantidade$
         +somar(Quantidade) Quantidade
@@ -71,150 +79,124 @@ classDiagram
         +menorQue(Quantidade) boolean
     }
 
-    class StatusVenda {
-        <<enumeration>>
-        ABERTA
-        CONFIRMADA
-    }
+    class RegraNegocioException
+    class EstoqueInsuficienteException
+    class OperacaoJaConcluidaException
 
-    class FormaPagamento {
-        <<enumeration>>
-        PIX
-        DINHEIRO
-        DEBITO
-        CREDITO
-    }
-
-    Usuario "1" --> "*" Venda : registra
-    Venda "1" *-- "1..*" ItemVenda : contém
-    ItemVenda "*" --> "1" Produto
-    Venda "1" --> "0..1" Pagamento
-    Produto "*" --> "1" Categoria
-    EntradaEstoque "*" --> "1" Produto : repõe
-    Usuario "1" --> "*" EntradaEstoque : registra
-    Venda ..> StatusVenda
-    Pagamento ..> FormaPagamento
-    Produto ..> Quantidade
+    Produto "1" -- "1" SaldoEstoque : tem
+    Produto "1" -- "0..*" Reserva : reservado em
+    Produto "1" -- "0..*" Movimentacao : histórico
+    Reserva "0..1" -- "0..*" Movimentacao : origina
+    Reserva --> StatusReserva
+    Movimentacao --> TipoMovimentacao
+    SaldoEstoque ..> Quantidade
+    SaldoEstoque ..> EstoqueInsuficienteException : lança
+    Reserva ..> OperacaoJaConcluidaException : lança
+    EstoqueInsuficienteException --|> RegraNegocioException
+    OperacaoJaConcluidaException --|> RegraNegocioException
 ```
 
-| Relacionamento | Tipo | Leitura |
-|---|---|---|
-| Usuario 1 : * Venda | Associação | Cada venda guarda quem vendeu (RN10, US14) |
-| Venda 1 : 1..* ItemVenda | Composição | O item só existe dentro da venda |
-| ItemVenda * : 1 Produto | Associação | O item guarda o preço da hora da venda, então mudar o preço do produto não altera vendas antigas |
-| Venda 1 : 0..1 Pagamento | Associação | A venda aberta ainda não tem pagamento; a confirmada tem um |
-| Produto * : 1 Categoria | Associação | Cada produto tem uma categoria (RN01) |
-| EntradaEstoque * : 1 Produto | Associação | Cada entrada repõe um produto (RN09) |
-| Usuario 1 : * EntradaEstoque | Associação | Registra quem deu a entrada |
+## 2. Serviço, repositório e padrões (`service`, `repository`, `controller`)
 
-## 2. Camadas e padrões (`controller`, `service`, `repository`)
+![Camadas](diagrama-camadas.png)
 
 ```mermaid
 classDiagram
     direction TB
 
-    class ConsoleController {
+    class Main {
+        +main(String[])$
+    }
+    class DemonstracaoEstoque {
+        -EstoqueService estoque
         +executar()
     }
-
-    class ProdutoService {
-        +cadastrar(nome, marca, categoria, preco, quantidade, estoqueMinimo) Produto
-        +editar(Produto)
-    }
-
-    class VendaService {
-        +iniciarVenda(Usuario) Venda
-        +adicionarItem(Venda, Long produtoId, int quantidade)
-        +confirmar(Venda, MeioPagamento)
+    class AlertaConsole {
+        +estoqueMinimoAtingido(AlertaEstoque)
     }
 
     class EstoqueService {
-        +registrarEntrada(Long produtoId, int quantidade, Usuario)
-        +darBaixa(Venda)
-        +adicionarListener(AlertaEstoqueListener)
+        -EstoqueRepository repositorio
+        -PoliticaReposicao politicaReposicao
+        -List~AlertaEstoqueListener~ ouvintes
+        +cadastrarProduto(String, String, int) Produto
+        +registrarEntrada(String, int) Movimentacao
+        +reservar(String, int) Reserva
+        +confirmarReserva(long) Movimentacao
+        +cancelarReserva(long) Movimentacao
+        +registrarSaida(String, int) Movimentacao
+        +trocarPoliticaReposicao(PoliticaReposicao)
+        +adicionarOuvinte(AlertaEstoqueListener)
+        -verificarEstoqueMinimo(String)
     }
 
-    class FaturamentoService {
-        +faturamentoDoDia(LocalDate) BigDecimal
+    class PoliticaReposicao {
+        <<interface Strategy>>
+        +sugerirReposicao(Produto, SaldoEstoque) Quantidade
+        +descricao() String
     }
-
-    class RegraNegocioException {
-        -String causa
-        -String solucao
+    class ReposicaoAteNivelAlvo {
+        -int multiplicador
     }
-
-    class MeioPagamento {
-        <<interface>>
-        +processar(Venda) Pagamento
+    class ReposicaoPorLoteFixo {
+        -int tamanhoLote
     }
-    class PagamentoPix {
-        +gerarCodigoPix(BigDecimal) String
-    }
-    class PagamentoDinheiro {
-        +calcularTroco(BigDecimal) BigDecimal
-    }
-    class PagamentoCartao
 
     class AlertaEstoqueListener {
-        <<interface>>
-        +estoqueMinimoAtingido(Produto)
+        <<interface Observer>>
+        +estoqueMinimoAtingido(AlertaEstoque)
     }
-    class AlertaConsole
-
-    class ProdutoRepository {
-        <<interface>>
-    }
-    class VendaRepository {
-        <<interface>>
-    }
-    class EntradaRepository {
-        <<interface>>
-    }
-    class UsuarioRepository {
-        <<interface>>
-    }
-    class SqliteProdutoRepository
-    class SqliteVendaRepository
-    class SqliteEntradaRepository
-    class SqliteUsuarioRepository
-
-    class ConexaoSQLite {
-        <<singleton>>
-        -ConexaoSQLite instancia$
-        +getInstancia() ConexaoSQLite$
+    class AlertaEstoque {
+        <<record>>
+        +Produto produto
+        +SaldoEstoque saldo
+        +Quantidade reposicaoSugerida
+        +String criterio
     }
 
-    ConsoleController --> ProdutoService
-    ConsoleController --> VendaService
-    ConsoleController --> EstoqueService
-    ConsoleController --> FaturamentoService
+    class EstoqueRepository {
+        <<interface>>
+        +buscarProduto(String) Optional~Produto~
+        +buscarSaldo(String) Optional~SaldoEstoque~
+        +buscarReserva(long) Optional~Reserva~
+        +movimentacoesDo(String) List~Movimentacao~
+        +emTransacao(trabalho) T
+    }
+    class Transacao {
+        <<interface>>
+        +salvarSaldo(SaldoEstoque)
+        +salvarReserva(Reserva)
+        +registrarMovimentacao(Movimentacao)
+    }
+    class EstoqueEmMemoria {
+        -Map produtos
+        -Map saldos
+        -Map reservas
+        -List movimentacoes
+    }
+    class EstoqueRepositoryComFalha {
+        <<Decorator>>
+        -EstoqueRepository real
+        +falharNaProximaMovimentacao()
+    }
 
-    VendaService --> EstoqueService
-    VendaService --> VendaRepository
-    VendaService --> ProdutoRepository
-    VendaService ..> MeioPagamento
-    ProdutoService --> ProdutoRepository
-    EstoqueService --> ProdutoRepository
-    EstoqueService --> EntradaRepository
-    EstoqueService o-- AlertaEstoqueListener
-    FaturamentoService --> VendaRepository
-
-    PagamentoPix ..|> MeioPagamento
-    PagamentoDinheiro ..|> MeioPagamento
-    PagamentoCartao ..|> MeioPagamento
+    Main ..> DemonstracaoEstoque : cria
+    DemonstracaoEstoque --> EstoqueService
+    EstoqueService "1" --> "1" EstoqueRepository
+    EstoqueService "1" --> "1" PoliticaReposicao
+    EstoqueService "1" o-- "0..*" AlertaEstoqueListener
+    EstoqueService ..> AlertaEstoque : cria
+    ReposicaoAteNivelAlvo ..|> PoliticaReposicao
+    ReposicaoPorLoteFixo ..|> PoliticaReposicao
     AlertaConsole ..|> AlertaEstoqueListener
-
-    SqliteProdutoRepository ..|> ProdutoRepository
-    SqliteVendaRepository ..|> VendaRepository
-    SqliteEntradaRepository ..|> EntradaRepository
-    SqliteUsuarioRepository ..|> UsuarioRepository
-    SqliteProdutoRepository --> ConexaoSQLite
-    SqliteVendaRepository --> ConexaoSQLite
-    SqliteEntradaRepository --> ConexaoSQLite
-    SqliteUsuarioRepository --> ConexaoSQLite
+    EstoqueEmMemoria ..|> EstoqueRepository
+    EstoqueRepositoryComFalha ..|> EstoqueRepository
+    EstoqueRepositoryComFalha --> EstoqueRepository : decora
+    EstoqueRepository ..> Transacao : usa
 ```
 
-* **Strategy:** `MeioPagamento` e as três implementações.
-* **Observer:** `EstoqueService` (sujeito) e `AlertaEstoqueListener` (observador), com `AlertaConsole` como ouvinte concreto.
-* **Repository (DAO):** as quatro interfaces e suas implementações `Sqlite*`.
-* **Singleton:** `ConexaoSQLite`, usado só pela camada `repository.sqlite`.
+| Padrão | Classes | Para quê |
+|---|---|---|
+| Strategy | `PoliticaReposicao`, `ReposicaoAteNivelAlvo`, `ReposicaoPorLoteFixo` | Critério de reposição substituível |
+| Observer | `EstoqueService`, `AlertaEstoqueListener`, `AlertaConsole` | Alerta de estoque mínimo |
+| Decorator | `EstoqueRepositoryComFalha` | Simular falha para demonstrar que nada fica gravado pela metade |
