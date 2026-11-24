@@ -3,8 +3,6 @@ package br.ufpb.aps.estoque.controller;
 import br.ufpb.aps.estoque.model.Movimentacao;
 import br.ufpb.aps.estoque.model.RegraNegocioException;
 import br.ufpb.aps.estoque.model.Reserva;
-import br.ufpb.aps.estoque.repository.EstoqueRepositoryComFalha;
-import br.ufpb.aps.estoque.repository.FalhaDePersistenciaException;
 import br.ufpb.aps.estoque.service.EstoqueService;
 import br.ufpb.aps.estoque.service.ReposicaoPorLoteFixo;
 
@@ -16,12 +14,10 @@ public class DemonstracaoEstoque {
     private static final String PRODUTO = "MON-24";
 
     private final EstoqueService estoque;
-    private final EstoqueRepositoryComFalha repositorio;
     private final PrintStream saida;
 
-    public DemonstracaoEstoque(EstoqueService estoque, EstoqueRepositoryComFalha repositorio, PrintStream saida) {
+    public DemonstracaoEstoque(EstoqueService estoque, PrintStream saida) {
         this.estoque = estoque;
-        this.repositorio = repositorio;
         this.saida = saida;
     }
 
@@ -64,25 +60,6 @@ public class DemonstracaoEstoque {
         mostrarSaldo();
         estoque.cancelarReserva(outra.id());
         saida.println("   Reserva " + outra.id() + " cancelada, unidade devolvida ao disponível.");
-        mostrarSaldo();
-
-        passo("10. Entrada de 5 com falha simulada ao gravar a movimentação");
-        int movimentacoesAntes = estoque.movimentacoes(PRODUTO).size();
-        String saldoAntes = estoque.saldo(PRODUTO).toString();
-        repositorio.falharNaProximaMovimentacao();
-        try {
-            estoque.registrarEntrada(PRODUTO, 5);
-        } catch (FalhaDePersistenciaException e) {
-            saida.println("   Erro: " + e.getMessage());
-        }
-        int movimentacoesDepois = estoque.movimentacoes(PRODUTO).size();
-        saida.println("   Saldo antes:  " + saldoAntes);
-        saida.println("   Saldo depois: " + estoque.saldo(PRODUTO));
-        saida.println("   Movimentações antes: " + movimentacoesAntes + " | depois: " + movimentacoesDepois);
-        saida.println("   Nada foi gravado pela metade: o saldo e o histórico continuam iguais.");
-
-        passo("11. A mesma entrada, agora sem falha");
-        estoque.registrarEntrada(PRODUTO, 5);
         mostrarSaldo();
 
         passo("Histórico de movimentações de " + PRODUTO);

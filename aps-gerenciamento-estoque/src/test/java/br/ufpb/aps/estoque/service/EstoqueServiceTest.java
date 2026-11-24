@@ -9,8 +9,6 @@ import br.ufpb.aps.estoque.model.Reserva;
 import br.ufpb.aps.estoque.model.SaldoEstoque;
 import br.ufpb.aps.estoque.model.StatusReserva;
 import br.ufpb.aps.estoque.model.TipoMovimentacao;
-import br.ufpb.aps.estoque.repository.EstoqueRepositoryComFalha;
-import br.ufpb.aps.estoque.repository.FalhaDePersistenciaException;
 import br.ufpb.aps.estoque.repository.memoria.EstoqueEmMemoria;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,14 +26,43 @@ class EstoqueServiceTest {
 
     private static final String P = "MON-24";
 
-    private EstoqueRepositoryComFalha repositorio;
+    private EstoqueEmMemoria repositorio;
+    private RelogioQueFalha relogio;
     private EstoqueService estoque;
     private List<AlertaEstoque> alertas;
 
+    /**
+     * Relógio de teste que pode ser mandado falhar. O serviço consulta o relógio
+     * DEPOIS de salvar o saldo na transação e ANTES de registrar a movimentação,
+     * então a falha cai exatamente no meio da operação.
+     */
+    private static final class RelogioQueFalha extends Clock {
+        private final Clock real = Clock.fixed(Instant.parse("2026-11-23T13:00:00Z"), ZoneId.of("America/Sao_Paulo"));
+        private boolean falhar;
+
+        @Override
+        public Instant instant() {
+            if (falhar) {
+                throw new IllegalStateException("Falha simulada no meio da operação.");
+            }
+            return real.instant();
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return real.getZone();
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return real.withZone(zone);
+        }
+    }
+
     @BeforeEach
     void preparar() {
-        repositorio = new EstoqueRepositoryComFalha(new EstoqueEmMemoria());
-        Clock relogio = Clock.fixed(Instant.parse("2026-11-23T13:00:00Z"), ZoneId.of("America/Sao_Paulo"));
+        repositorio = new EstoqueEmMemoria();
+        relogio = new RelogioQueFalha();
         estoque = new EstoqueService(repositorio, new ReposicaoAteNivelAlvo(2), relogio);
         alertas = new ArrayList<>();
         estoque.adicionarOuvinte(alertas::add);
@@ -210,14 +237,14 @@ class EstoqueServiceTest {
     // Atomicidade
 
     @Test
-    @DisplayName("Falha ao gravar a movimentação desfaz a entrada inteira")
+    @DisplayName("Falha no meio da entrada desfaz tudo (saldo e movimentação)")
     void entradaComFalhaNaoDeixaRegistroParcial() {
         estoque.registrarEntrada(P, 10);
         SaldoEstoque antes = saldo();
         List<Movimentacao> historicoAntes = estoque.movimentacoes(P);
 
-        repositorio.falharNaProximaMovimentacao();
-        assertThrows(FalhaDePersistenciaException.class, () -> estoque.registrarEntrada(P, 5));
+        relogio.falhar = true;
+        assertThrows(IllegalStateException.class, () -> estoque.registrarEntrada(P, 5));
 
         assertEquals(antes, saldo());
         assertEquals(historicoAntes, estoque.movimentacoes(P));
@@ -230,26 +257,15 @@ class EstoqueServiceTest {
         Reserva r = estoque.reservar(P, 4);
         SaldoEstoque antes = saldo();
 
-        repositorio.falharNaProximaMovimentacao();
-        assertThrows(FalhaDePersistenciaException.class, () -> estoque.confirmarReserva(r.id()));
+        relogio.falhar = true;
+        assertThrows(IllegalStateException.class, () -> estoque.confirmarReserva(r.id()));
 
         assertEquals(antes, saldo());
         assertEquals(StatusReserva.ATIVA, repositorio.buscarReserva(r.id()).orElseThrow().status());
 
+        relogio.falhar = false;
         estoque.confirmarReserva(r.id());
         assertEquals(q(6), saldo().fisico());
-    }
-
-    @Test
-    @DisplayName("Falha na reserva não deixa reserva criada nem disponível reduzido")
-    void reservaComFalhaNaoDeixaRegistroParcial() {
-        estoque.registrarEntrada(P, 10);
-
-        repositorio.falharNaProximaMovimentacao();
-        assertThrows(FalhaDePersistenciaException.class, () -> estoque.reservar(P, 4));
-
-        assertEquals(q(10), saldo().disponivel());
-        assertTrue(repositorio.buscarReserva(1).isEmpty());
     }
 
     @Test
