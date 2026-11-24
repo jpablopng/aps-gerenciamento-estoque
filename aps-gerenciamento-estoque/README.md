@@ -17,7 +17,7 @@ Professor: Dr. Dorgival Netto
 | João Pablo da Silva | joao.pablo@dcx.ufpb.br | @jpablopng | https://github.com/jpablopng |
 | Luigi Truglio Amarante Chaves | luigi.truglio@dcx.ufpb.br | @luigidcx | https://github.com/luigidcx |
 | Alex Renovato | alex.renovato@dcx.ufpb.br | @AlexRenovato | https://github.com/AlexRenovato |
-| Pedro Filho |  pedro.fernandes@dcx.ufpb.brr | @PedroFernandes-fa | https://github.com/usuario |
+| Pedro Filho |  pedro.fernandes@dcx.ufpb.brr | @PedroFernandes-fa | https://github.com/PedroFernandes-fa |
 
 ## Objetivo do sistema
 
