@@ -70,3 +70,9 @@ O alerta de estoque mínimo (US07) acontece dentro do UC01, quando a baixa deixa
 | RN08 | Um item só entra na venda se houver estoque suficiente (fluxo de exceção do UC01) | Sim (nova) |
 | RN09 | A entrada de mercadoria soma a quantidade ao estoque do produto | Sim (nova) |
 | RN10 | Toda venda registra quem vendeu, o que foi vendido e a forma de pagamento | Sim (nova) |
+
+## Diagrama de classes
+
+![Diagrama de classes: domínio](docs/uml/diagrama-dominio.png)
+
+![Diagrama de classes: serviço, repositório e padrões](docs/uml/diagrama-camadas.png)
