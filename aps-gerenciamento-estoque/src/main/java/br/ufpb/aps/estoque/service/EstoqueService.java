@@ -1,12 +1,15 @@
 package br.ufpb.aps.estoque.service;
 
+import br.ufpb.aps.estoque.model.AcessoNegadoException;
 import br.ufpb.aps.estoque.model.Movimentacao;
+import br.ufpb.aps.estoque.model.Permissao;
 import br.ufpb.aps.estoque.model.Produto;
 import br.ufpb.aps.estoque.model.Quantidade;
 import br.ufpb.aps.estoque.model.RegraNegocioException;
 import br.ufpb.aps.estoque.model.Reserva;
 import br.ufpb.aps.estoque.model.SaldoEstoque;
 import br.ufpb.aps.estoque.model.TipoMovimentacao;
+import br.ufpb.aps.estoque.model.Usuario;
 import br.ufpb.aps.estoque.repository.EstoqueRepository;
 import br.ufpb.aps.estoque.repository.Transacao;
 
@@ -16,7 +19,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/** Casos de uso do estoque. Cada operação altera saldo e movimentação numa única transação e depois confere o estoque mínimo. */
+/**
+ * Casos de uso do estoque. Antes de cada operação confere se o perfil do usuário permite;
+ * depois altera saldo e movimentação numa única transação e confere o estoque mínimo.
+ */
 public class EstoqueService {
 
     private final EstoqueRepository repositorio;
@@ -38,7 +44,9 @@ public class EstoqueService {
         ouvintes.add(Objects.requireNonNull(ouvinte));
     }
 
-    public void trocarPoliticaReposicao(PoliticaReposicao nova) {
+    /** Só o Gerente troca a política de reposição. */
+    public void trocarPoliticaReposicao(Usuario usuario, PoliticaReposicao nova) {
+        exigirPermissao(usuario, Permissao.TROCAR_POLITICA_REPOSICAO);
         this.politicaReposicao = Objects.requireNonNull(nova);
     }
 
@@ -46,7 +54,9 @@ public class EstoqueService {
         return politicaReposicao;
     }
 
-    public Produto cadastrarProduto(String codigo, String nome, int estoqueMinimo) {
+    /** Só o Gerente cadastra produto. */
+    public Produto cadastrarProduto(Usuario usuario, String codigo, String nome, int estoqueMinimo) {
+        exigirPermissao(usuario, Permissao.CADASTRAR_PRODUTO);
         if (estoqueMinimo < 0) {
             throw new RegraNegocioException("O estoque mínimo não pode ser negativo. Informe zero ou mais.");
         }
@@ -63,7 +73,8 @@ public class EstoqueService {
     }
 
     /** Entrada de mercadoria: aumenta o estoque físico e o disponível. */
-    public Movimentacao registrarEntrada(String codigoProduto, int quantidade) {
+    public Movimentacao registrarEntrada(Usuario usuario, String codigoProduto, int quantidade) {
+        exigirPermissao(usuario, Permissao.REGISTRAR_ENTRADA);
         Quantidade q = quantidadePositiva(quantidade);
         Movimentacao mov = repositorio.emTransacao(tx -> {
             SaldoEstoque novo = saldoDe(tx, codigoProduto).comEntrada(q);
@@ -75,7 +86,8 @@ public class EstoqueService {
     }
 
     /** Reserva: separa parte do disponível. Recusa se pedir mais que o disponível. */
-    public Reserva reservar(String codigoProduto, int quantidade) {
+    public Reserva reservar(Usuario usuario, String codigoProduto, int quantidade) {
+        exigirPermissao(usuario, Permissao.RESERVAR);
         Quantidade q = quantidadePositiva(quantidade);
         Reserva reserva = repositorio.emTransacao(tx -> {
             SaldoEstoque novo = saldoDe(tx, codigoProduto).comReserva(q);
@@ -90,10 +102,11 @@ public class EstoqueService {
     }
 
     /**
-     * Confirma a reserva: a quantidade sai do estoque físico. Uma reserva só pode
+     * Confirma a reserva: a quantidade sai do estoque físico (é uma saída). Uma reserva só pode
      * ser confirmada uma vez; a segunda tentativa é recusada sem alterar nada.
      */
-    public Movimentacao confirmarReserva(long reservaId) {
+    public Movimentacao confirmarReserva(Usuario usuario, long reservaId) {
+        exigirPermissao(usuario, Permissao.REGISTRAR_SAIDA);
         Movimentacao mov = repositorio.emTransacao(tx -> {
             Reserva confirmada = reservaDe(tx, reservaId).confirmada();
             SaldoEstoque novo = saldoDe(tx, confirmada.produtoCodigo())
@@ -107,7 +120,8 @@ public class EstoqueService {
     }
 
     /** Cancela a reserva e devolve a quantidade ao disponível. */
-    public Movimentacao cancelarReserva(long reservaId) {
+    public Movimentacao cancelarReserva(Usuario usuario, long reservaId) {
+        exigirPermissao(usuario, Permissao.RESERVAR);
         Movimentacao mov = repositorio.emTransacao(tx -> {
             Reserva cancelada = reservaDe(tx, reservaId).cancelada();
             SaldoEstoque novo = saldoDe(tx, cancelada.produtoCodigo())
@@ -121,7 +135,8 @@ public class EstoqueService {
     }
 
     /** Saída sem reserva prévia. Recusa se pedir mais que o disponível. */
-    public Movimentacao registrarSaida(String codigoProduto, int quantidade) {
+    public Movimentacao registrarSaida(Usuario usuario, String codigoProduto, int quantidade) {
+        exigirPermissao(usuario, Permissao.REGISTRAR_SAIDA);
         Quantidade q = quantidadePositiva(quantidade);
         Movimentacao mov = repositorio.emTransacao(tx -> {
             SaldoEstoque novo = saldoDe(tx, codigoProduto).comSaidaDireta(q);
@@ -139,6 +154,18 @@ public class EstoqueService {
 
     public List<Movimentacao> movimentacoes(String codigoProduto) {
         return repositorio.movimentacoesDo(codigoProduto);
+    }
+
+    /** Recusa a operação antes de qualquer validação ou gravação se o perfil não permitir. */
+    private static void exigirPermissao(Usuario usuario, Permissao permissao) {
+        if (usuario == null) {
+            throw new AcessoNegadoException("Nenhum usuário identificado. Entre no sistema para "
+                    + permissao.descricao() + ".");
+        }
+        if (!usuario.pode(permissao)) {
+            throw new AcessoNegadoException("Acesso negado: o perfil " + usuario.perfil().rotulo()
+                    + " não pode " + permissao.descricao() + ". Peça a um Gerente.");
+        }
     }
 
     private Movimentacao registrar(Transacao tx, TipoMovimentacao tipo, Quantidade quantidade,

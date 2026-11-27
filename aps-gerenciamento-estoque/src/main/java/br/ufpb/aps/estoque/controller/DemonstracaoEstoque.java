@@ -1,8 +1,10 @@
 package br.ufpb.aps.estoque.controller;
 
 import br.ufpb.aps.estoque.model.Movimentacao;
+import br.ufpb.aps.estoque.model.Perfil;
 import br.ufpb.aps.estoque.model.RegraNegocioException;
 import br.ufpb.aps.estoque.model.Reserva;
+import br.ufpb.aps.estoque.model.Usuario;
 import br.ufpb.aps.estoque.service.EstoqueService;
 import br.ufpb.aps.estoque.service.ReposicaoPorLoteFixo;
 
@@ -15,6 +17,8 @@ public class DemonstracaoEstoque {
 
     private final EstoqueService estoque;
     private final PrintStream saida;
+    private final Usuario gerente = new Usuario("Gerente", Perfil.GERENTE);
+    private final Usuario operador = new Usuario("Operador de Caixa", Perfil.OPERADOR);
 
     public DemonstracaoEstoque(EstoqueService estoque, PrintStream saida) {
         this.estoque = estoque;
@@ -22,43 +26,49 @@ public class DemonstracaoEstoque {
     }
 
     public void executar() {
-        passo("1. Cadastro do produto (estoque mínimo 3)");
-        estoque.cadastrarProduto(PRODUTO, "Monitor 24 polegadas", 3);
+        passo("0. Operador tenta cadastrar produto (só o Gerente pode)");
+        tentar(() -> estoque.cadastrarProduto(operador, "TEC-01", "Teclado", 2));
+
+        passo("1. Gerente cadastra o produto (estoque mínimo 3)");
+        estoque.cadastrarProduto(gerente, PRODUTO, "Monitor 24 polegadas", 3);
         mostrarSaldo();
 
-        passo("2. Entrada de 10 unidades");
-        estoque.registrarEntrada(PRODUTO, 10);
+        passo("2. Operador dá entrada de 10 unidades");
+        estoque.registrarEntrada(operador, PRODUTO, 10);
         mostrarSaldo();
 
-        passo("3. Reserva de 4 unidades: o físico não muda, o disponível cai");
-        Reserva reserva = estoque.reservar(PRODUTO, 4);
+        passo("3. Operador reserva 4 unidades: o físico não muda, o disponível cai");
+        Reserva reserva = estoque.reservar(operador, PRODUTO, 4);
         saida.println("   " + reserva);
         mostrarSaldo();
 
         passo("4. Tentativa de reservar 7 (só há 6 disponíveis)");
-        tentar(() -> estoque.reservar(PRODUTO, 7));
+        tentar(() -> estoque.reservar(operador, PRODUTO, 7));
         mostrarSaldo();
 
         passo("5. Confirmação da reserva " + reserva.id() + ": as 4 unidades saem do físico");
-        estoque.confirmarReserva(reserva.id());
+        estoque.confirmarReserva(operador, reserva.id());
         mostrarSaldo();
 
         passo("6. Segunda confirmação da mesma reserva");
-        tentar(() -> estoque.confirmarReserva(reserva.id()));
+        tentar(() -> estoque.confirmarReserva(operador, reserva.id()));
         mostrarSaldo();
 
         passo("7. Saída direta de 7 (só há 6 disponíveis)");
-        tentar(() -> estoque.registrarSaida(PRODUTO, 7));
+        tentar(() -> estoque.registrarSaida(operador, PRODUTO, 7));
 
         passo("8. Saída direta de 4: o disponível cai para 2 e dispara o alerta");
-        estoque.registrarSaida(PRODUTO, 4);
+        estoque.registrarSaida(operador, PRODUTO, 4);
         mostrarSaldo();
 
-        passo("9. Troca da política de reposição para lotes de 12 e nova reserva de 1");
-        estoque.trocarPoliticaReposicao(new ReposicaoPorLoteFixo(12));
-        Reserva outra = estoque.reservar(PRODUTO, 1);
+        passo("9. Operador tenta trocar a política de reposição (só o Gerente pode)");
+        tentar(() -> estoque.trocarPoliticaReposicao(operador, new ReposicaoPorLoteFixo(12)));
+
+        passo("10. Gerente troca a política para lotes de 12 e o Operador reserva 1");
+        estoque.trocarPoliticaReposicao(gerente, new ReposicaoPorLoteFixo(12));
+        Reserva outra = estoque.reservar(operador, PRODUTO, 1);
         mostrarSaldo();
-        estoque.cancelarReserva(outra.id());
+        estoque.cancelarReserva(operador, outra.id());
         saida.println("   Reserva " + outra.id() + " cancelada, unidade devolvida ao disponível.");
         mostrarSaldo();
 

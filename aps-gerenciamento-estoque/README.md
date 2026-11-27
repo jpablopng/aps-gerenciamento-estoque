@@ -37,7 +37,7 @@ automaticamente, alertar quando um produto chega no estoque mínimo e mostrar o 
   * Backlog do Produto com critérios de aceite
 * **O que foi revisto ou adaptado:**
   * O MVP ficou com as histórias de prioridade alta (US01 a US07) mais a US09 (forma de pagamento), que a venda precisa. US04 (mensagens de erro claras) é tratada como requisito de qualidade em todos os casos de uso.
-  * **Perfis:** na entrevista o cliente disse que não precisa de níveis de acesso, porque só ele e o pai operam o caixa. O sistema tem um único ator, o Operador de Caixa, com login apenas para registrar quem fez cada venda (US14). O ator "Admin" do diagrama de casos de uso não foi implementado.
+  * **Perfis:** na entrevista o cliente disse que só ele e o pai operam o caixa e que não precisa de níveis de acesso. Mesmo assim, o sistema separa dois perfis para proteger as operações que mudam o cadastro e a reposição: o **Operador** cuida do dia a dia do estoque, e o **Gerente** (o antigo ator "Admin" do diagrama de casos de uso) também cadastra produtos e troca a política de reposição. Veja [Perfis de acesso](#perfis-de-acesso).
   * **Pix:** o cliente quer o QR Code gerado na hora com o valor da compra. Nesta versão o sistema gera o código Pix com o valor e o operador confirma o recebimento. A confirmação automática via API (fluxo alternativo do UC01) fica para a próxima versão ([ADR 003](docs/adr/003-padroes-de-projeto.md)).
   * **Cartão:** o cliente passa o cartão na maquininha; o sistema só registra se foi débito ou crédito.
   * **Cancelamento de venda (US18, RN05) e nota fiscal (US17):** fora do MVP.
@@ -70,6 +70,26 @@ O alerta de estoque mínimo (US07) acontece dentro do UC01, quando a baixa deixa
 | RN08 | Um item só entra na venda se houver estoque suficiente (fluxo de exceção do UC01) | Sim (nova) |
 | RN09 | A entrada de mercadoria soma a quantidade ao estoque do produto | Sim (nova) |
 | RN10 | Toda venda registra quem vendeu, o que foi vendido e a forma de pagamento | Sim (nova) |
+| RN11 | Cada operação de estoque só é executada se o perfil do usuário tiver permissão para ela | Sim (nova) |
+
+### Perfis de acesso
+
+O `EstoqueService` confere a permissão do usuário antes de cada operação, antes de validar os dados
+e antes de gravar qualquer coisa. Se o perfil não permitir, a operação é recusada com
+`AcessoNegadoException` e o estoque não muda. Operação sem usuário identificado também é recusada.
+
+| Operação | Permissão | Operador | Gerente |
+|---|---|:---:|:---:|
+| Registrar entrada de mercadoria | `REGISTRAR_ENTRADA` | Sim | Sim |
+| Reservar e cancelar reserva | `RESERVAR` | Sim | Sim |
+| Registrar saída e confirmar reserva | `REGISTRAR_SAIDA` | Sim | Sim |
+| Cadastrar produto | `CADASTRAR_PRODUTO` | Não | Sim |
+| Trocar a política de reposição | `TROCAR_POLITICA_REPOSICAO` | Não | Sim |
+
+Consultar saldo e histórico de movimentações não exige permissão.
+
+As classes ficam no pacote `model`: `Perfil`, `Permissao`, `Usuario` e `AcessoNegadoException`.
+Os testes de acesso negado estão em `ControleAcessoTest`.
 
 ## Diagrama de classes
 
